@@ -1,0 +1,14 @@
+		1.function 
+	1.Member Join Log
+	2.	Member Leave / Kick Detection
+	3.	Ban Log
+	4.	Message Delete Log (with content)
+	5.	Message Edit Log (before / after)
+	6.	Channel Create Log
+	7.	Channel Delete Log
+	8.	Role Create Log
+	9.	Role Delete Log
+	10.	Role Add / Remove Tracking
+	11.	Moderator Action Tracking
+	12.	Real-time Server Activity Logging
+	13.	/setlog Command (set log channel)
