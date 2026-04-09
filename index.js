@@ -9,10 +9,26 @@ const {
   AuditLogEvent
 } = require('discord.js');
 
+const fs = require('fs');
+
 const TOKEN = '';
 const CLIENT_ID = '';
-const GUILD_ID = '';
 
+/* ================== JSON 로드 ================== */
+let logChannels = {};
+
+try {
+  logChannels = JSON.parse(fs.readFileSync('./logChannels.json'));
+} catch {
+  logChannels = {};
+}
+
+/* ================== 저장 함수 ================== */
+function saveLogs() {
+  fs.writeFileSync('./logChannels.json', JSON.stringify(logChannels, null, 2));
+}
+
+/* ================== 클라이언트 ================== */
 const client = new Client({
   intents: [
     GatewayIntentBits.Guilds,
@@ -24,9 +40,7 @@ const client = new Client({
   partials: [Partials.Message, Partials.Channel]
 });
 
-let logId = null;
-
-/* 슬래시 명령어 등록 */
+/* ================== 슬래시 명령어 ================== */
 const commands = [
   new SlashCommandBuilder()
     .setName('setlog')
@@ -43,24 +57,27 @@ const rest = new REST({ version: '10' }).setToken(TOKEN);
 (async () => {
   try {
     await rest.put(
-      Routes.applicationGuildCommands(CLIENT_ID, GUILD_ID),
+      Routes.applicationCommands(CLIENT_ID),
       { body: commands }
     );
-    console.log('slash registered');
+    console.log('slash registered (global)');
   } catch (e) {
     console.log(e);
   }
 })();
 
-/* 로그 전송 */
+/* ================== 로그 전송 ================== */
 function send(guild, embed) {
+  const logId = logChannels[guild.id];
   if (!logId) return;
+
   const ch = guild.channels.cache.get(logId);
   if (!ch) return;
+
   ch.send({ embeds: [embed] }).catch(() => {});
 }
 
-/* 실행자 찾기 */
+/* ================== 실행자 찾기 ================== */
 async function getExecutor(guild, type, targetId) {
   try {
     const logs = await guild.fetchAuditLogs({ limit: 5, type });
@@ -71,35 +88,29 @@ async function getExecutor(guild, type, targetId) {
   }
 }
 
-/* 봇 시작 알림 */
+/* ================== 봇 시작 ================== */
 client.once('ready', () => {
   console.log(`logged in: ${client.user.tag}`);
 });
 
-/* 슬래시 명령어 목록 */
+/* ================== 명령어 ================== */
 client.on('interactionCreate', async i => {
   if (!i.isChatInputCommand()) return;
 
   if (i.commandName === 'setlog') {
-    try {
-      await i.deferReply({ ephemeral: true });
+    await i.deferReply({ ephemeral: true });
 
-      const ch = i.options.getChannel('channel');
-      if (!ch) return i.editReply('no channel');
+    const ch = i.options.getChannel('channel');
+    if (!ch) return i.editReply('no channel');
 
-      logId = ch.id;
+    logChannels[i.guild.id] = ch.id;
+    saveLogs();
 
-      await i.editReply('log channel set');
-    } catch (e) {
-      console.log('interaction error:', e);
-      try {
-        await i.editReply('error');
-      } catch {}
-    }
+    await i.editReply('log channel set for this server');
   }
 });
 
-/* 이벤트 로그 */
+/* ================== 이벤트 로그 ================== */
 
 client.on('guildMemberAdd', m => {
   send(m.guild,
@@ -144,7 +155,6 @@ client.on('guildBanAdd', async b => {
 
 client.on('messageDelete', async m => {
   if (!m.guild || !m.author) return;
-
   if (m.author.bot) return;
 
   const ex = await getExecutor(m.guild, AuditLogEvent.MessageDelete, m.author.id);
@@ -164,9 +174,7 @@ client.on('messageDelete', async m => {
 
 client.on('messageUpdate', (o, n) => {
   if (!n.guild || !n.author) return;
-
   if (n.author.bot) return;
-
   if (o.content === n.content) return;
 
   send(n.guild,
@@ -251,4 +259,5 @@ client.on('roleDelete', async r => {
   );
 });
 
+/* ================== 로그인 ================== */
 client.login(TOKEN);
